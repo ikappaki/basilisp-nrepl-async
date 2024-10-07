@@ -3,7 +3,7 @@
 # A Basilisp async nREPL server for cooperative multitasking
 
 ## Overview
-`basilisp-nrepl-async` is an nREPL server implementation for Basilisp that allows client requests to be evaluated asynchronously by the main program at a chosen time and place. This enables cooperative multitasking on a single thread between the program and the nREPL server.
+`basilisp-nrepl-async` is an nREPL server implementation for [Basilisp](https://basilisp.readthedocs.io/en/latest/) that allows client requests to be evaluated asynchronously by the main program at a chosen time and place. This enables cooperative multitasking on a single thread between the program and the nREPL server on the Python VM.
 
 ## Installation
 
@@ -15,7 +15,7 @@ pip install basilisp-nrepl-async
 
 ## Usage
 
-Start the nREPL server in async mode and periodically call its `work-fn` within the program's main loop
+To start the nREPL server on a random port bound to the local interface, call the the `basilisp-nrepl-async.nrepl-server/server-start!` function with the `async?` option set to `true`, and periodically invoke the returned `work-fn` within your program's main loop. 
 
 ```clojure
 (require '[basilisp-nrepl-async.nrepl-server :as nr])
@@ -40,6 +40,9 @@ Start the nREPL server in async mode and periodically call its `work-fn` within 
       (recur))))
 ```
 
+The server will create an `.nrepl-port` file in the current working directory with the port number, which nREPL-enabled Clojure editors can use to connect.
+
+You can also pass additional options to the `server-start!` function, such as `:address` and `:port`, to explicitly set the server's listening interface and port, respectively. See the function documentation for more details.
 
 ## Development and Testing
 

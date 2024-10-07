@@ -34,5 +34,5 @@ jobs:
       run: gh release upload ${{ github.event.release.tag_name }} dist/*.{tar.gz,whl}
       env:
         GH_TOKEN: ${{ github.token }}
-    - name: Publish package distributions to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+    # - name: Publish package distributions to PyPI
+    #   uses: pypa/gh-action-pypi-publish@release/v1

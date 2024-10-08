@@ -10,7 +10,7 @@
 To install `basilisp-nrepl-async`, run:
 
 ```shell
-pip install basilisp-nrepl-async
+pip install https://github.com/ikappaki/basilisp-nrepl-async/releases/download/v0.1.0b1/basilisp_nrepl_async-0.1.0b1-py3-none-any.whl
 ```
 
 ## Usage

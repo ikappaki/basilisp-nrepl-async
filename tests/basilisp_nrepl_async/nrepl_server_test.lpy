@@ -234,7 +234,10 @@
                                                     (.sendall sock encoded)
                                                     (.recv sock 1024)))))))
                 {:keys [error]} (deref client-thread 1000 nil)]
-            (is (str/starts-with?  (u/error->str error) ":server-make-async-test-error TimeoutError('timed out')")
+            (is (str/starts-with?  (u/error->str error) #?(:lpy39-
+                                                           ":server-make-async-test-error timeout('timed out')"
+                                                           :lpy310+
+                                                           ":server-make-async-test-error TimeoutError('timed out')"))
                 (u/error->str error)))
 
           (let [work-fut (future

@@ -1,30 +1,28 @@
 ;; adapted from
 ;; https://github.com/basilisp-lang/basilisp/blob/b4d9c2d6ed1aaa9ba2f4b1dc0e8073813aab1315/src/basilisp/contrib/nrepl_server.lpy
 (ns basilisp-nrepl-async.nrepl-server
-  "A port of `nbb <https://github.com/babashka/nbb>`_'s nREPL server implementation to basilisp.
-
-  Additions:
-
-  - Client requests can be collected into a map for asynchronous
-  processing outside the current execution thread."
   (:require [basilisp.contrib.bencode :as bc]
-            [basilisp.stacktrace :as strace]
             [basilisp.string :as str]
             [basilisp-nrepl-async.utils :as u])
-  (:import contextlib
+  (:import basilisp.logconfig
+           contextlib
            logging
+           os
            queue
            socket
            socketserver
            sys
            threading
-           traceback
-           uuid))
+           urllib
+           traceback))
 
 (def logger
   "The logger for this namespace."
   (logging/getLogger (namespace ::)))
 
+(defmacro ^:private trace [& values]
+  `(when (.isEnabledFor logger basilisp.logconfig/TRACE)
+     (.log logger basilisp.logconfig/TRACE (str/join " " [~@values]))))
 (defmacro ^:private debug [& values]
   `(when (.isEnabledFor logger logging/DEBUG)
     (.debug logger (str/join " " [~@values]))))
@@ -65,43 +63,41 @@
 
 (defn- log-request-mw [handler]
   (fn [request send-fn]
-    (info :request (dissoc request :client*))
+    (debug :request (dissoc request :client*))
     (handler request send-fn)))
 
 (defn- log-response-mw [handler]
   (fn [request response]
-    (info :response response)
+    (debug :response response)
     (handler request response)))
 
 (declare ops)
 
 (defn- handle-describe [request send-fn]
-  (send-fn request
-           {"versions" {"basilisp" (let [version basilisp.lang.runtime/BASILISP-VERSION-STRING]
-                                     (assoc (zipmap ["major" "minor" "incremental"]
-                                                    version)
-                                            "version-string" (str/join "." version)))
-                        "python" (let [version (get (.split sys/version " ") 0)]
-                                   (assoc (zipmap ["major" "minor" "incremental"]
-                                                  (py->lisp (.split version ".")))
-                                          "version-string" (py->lisp sys/version)))}
-            "ops" (zipmap (map name (keys ops)) (repeat {}))
-            "status" ["done"]}))
+  (let [basilisp-version   (-> (zipmap ["major" "minor" "incremental"] *basilisp-version*)
+                               (assoc "version-string" (str/join "." *basilisp-version*)))
+        python-version     (-> (zipmap ["major" "minor" "incremental"] *python-version*)
+                               (assoc "version-string" (str/join "." *python-version*)))]
+    (send-fn request
+             {"versions" {"basilisp" basilisp-version
+                          "python"   python-version}
+              "ops"      (zipmap (map name (keys ops)) (repeat {}))
+              "status"   ["done"]})))
 
 (defn- format-value [_nrepl-pprint _pprint-options value]
   (pr-str value))
 
 (defn- send-value [request send-fn v]
-  (let [{:keys [client*]}  request
-        {:keys [*1 *2]} @client*
-        [v opts]           v
-        ns                 (:ns opts)]
+  (let [{:keys [client*]} request
+        {:keys [*1 *2]}   @client*
+        [v opts]          v
+        ns                (:ns opts)]
     (swap! client* assoc :*1 v :*2 *1 :*3 *2)
     (let [v (format-value (:nrepl.middleware.print/print request)
                           (:nrepl.middleware.print/options request)
                           v)]
       (send-fn request {"value" (str v)
-                        "ns" (str ns)}))))
+                        "ns"    (str ns)}))))
 
 (defn- handle-error [send-fn request e]
   (let [{:keys [client* ns]} request
@@ -109,9 +105,9 @@
         message              (or (:message data) (str e))]
     (swap! client* assoc :*e e)
     (send-fn request {"err" (str message)})
-    (send-fn request {"ex" (traceback/format-exc)
+    (send-fn request {"ex"     (traceback/format-exc)
                       "status" ["eval-error"]
-                      "ns" ns})))
+                      "ns"     ns})))
 
 (defn- do-handle-eval
   "Evaluate the ``request`` ``code`` of ``file`` in the ``ns`` namespace
@@ -128,32 +124,38 @@
   It binds the `*1`, `*2`, `*3` and `*e` variables for evaluation from
   the corresponding ones found in ``client*``, and updates the latter
   according to the result."
-  [{:keys [client* code ns file _column _line] :as request} send-fn]
+  [{:keys [client* code ns file column line] :as request} send-fn]
   (let [{:keys [*1 *2 *3 *e eval-ns]} @client*
         out-stream                    (StreamOutFn #(send-fn request {"out" %}))
-        reader                        (io/StringIO code)
         ctx                           (basilisp.lang.compiler.CompilerContext. (or file "<nREPL Input>"))
         eval-ns                       (if ns
                                         (create-ns (symbol ns))
                                         eval-ns)]
-    (binding [*ns* eval-ns
+    (binding [*ns*  eval-ns
               *out* out-stream
-              *1 *1 *2 *2 *3 *3 *e *e]
+              *1    *1
+              *2    *2
+              *3    *3
+              *e    *e]
       (try
-        (let [results (for [form (seq (basilisp.lang.reader/read reader
-                                                                 *resolver*
-                                                                 *data-readers*))]
+        (let [result (last
+                      (for [form (read-seq (cond-> {}
+                                             line   (assoc :init-line   line)
+                                             column (assoc :init-column column))
+                                           (io/StringIO code))]
                         (basilisp.lang.compiler/compile-and-exec-form form
                                                                       ctx
-                                                                      *ns*))
-              result  (last results)]
+                                                                      *ns*)))]
           (send-value request send-fn [result {:ns (str *ns*)}]))
         (catch python/Exception e
-          (info :eval-exception e)
-          (handle-error send-fn (assoc request :ns (str *ns*)) e))
+          (debug :eval-exception e)
+          (let [msg (->> (basilisp.lang.exception/format_exception e
+                                                                   ** :disable-color true)
+                         (str/join ""))]
+            (handle-error send-fn (assoc request :ns (str *ns*)) msg)))
         (finally
           (swap! client* assoc :eval-ns *ns*)
-          (send-fn request {"ns" (str *ns*)
+          (send-fn request {"ns"     (str *ns*)
                             "status" ["done"]}))))))
 
 (defn- handle-eval [request send-fn]
@@ -192,12 +194,10 @@
   [resolve-ns symbol-str]
   (let [reader               (io/StringIO symbol-str)
         {:keys [form error]} (try {:form (binding [*ns* resolve-ns]
-                                           (first (seq (basilisp.lang.reader/read reader
-                                                                                  *resolver*
-                                                                                  *data-readers*))))}
-             (catch python/Exception e
-               (info :symbol-identify-reader-error :input symbol-str :exception e)
-               {:error (str e)}))]
+                                           (read reader))}
+                                  (catch python/Exception e
+                                    (debug :symbol-identify-reader-error :input symbol-str :exception e)
+                                    {:error (str e)}))]
 
     (cond
       error
@@ -217,12 +217,9 @@
                                      (catch python/Exception e
                                        {:error (str e)}))]
         (cond
-          var
-          [:var var]
-          error
-          [:error error]
-          :else
-          [:other form])))))
+          var   [:var var]
+          error [:error error]
+          :else [:other form])))))
 
 (defn- forms-join [forms]
   (->> (map pr-str forms)
@@ -238,37 +235,45 @@
   (let [mapping-type      (-> request :op)
         {:keys [eval-ns]} @client*]
     (try
-      (let [lookup-ns      (if ns
-                             (create-ns (symbol ns))
-                             eval-ns)
-            sym-str        (or (:sym request) ;; cider
-                               (:symbol request) ;; calva
-                               )
+      (let [lookup-ns (if ns
+                        (create-ns (symbol ns))
+                        eval-ns)
+            sym-str   (or (:sym request) ;; cider
+                          (:symbol request) ;; calva
+                          )
+
             [tp var-maybe] (symbol-identify lookup-ns sym-str)
             var-meta       (when (= tp :var) (meta var-maybe))
-            {:keys [arglists doc file ns line] symname :name} var-meta
-            ref            (when (= tp :var) (var-get var-maybe))
-            response       (when symname (case mapping-type
-                                           :eldoc (cond->
-                                                      {"eldoc" (mapv #(mapv str %) arglists)
-                                                       "ns" (str ns)
-                                                       "type"  (if (fn? ref)
-                                                                 "function"
-                                                                 "variable")
-                                                       "name" (str symname)
-                                                       "status" ["done"]}
-                                                    doc (assoc "docstring" doc))
-                                           :info {"doc" doc
-                                                  "ns" (str ns)
-                                                  "name" (str symname)
-                                                  "file" file
-                                                  "line" line
-                                                  "arglists-str" (forms-join arglists)
-                                                  "status" ["done"]}))
-            status (if (and (nil? symname) (= mapping-type :eldoc) )
-                     ["done" "no-eldoc"]
-                     ["done"])]
-        (debug :lookup :sym sym-str :doc doc :args arglists)
+
+            {:keys [arglists doc file ns line col] symname :name} var-meta
+
+            ref      (when (= tp :var) (var-get var-maybe))
+            response (when symname
+                       (case mapping-type
+                         :eldoc (cond->
+                                    {"eldoc"  (mapv #(mapv str %) arglists)
+                                     "ns"     (str ns)
+                                     "type"   (if (fn? ref)
+                                                "function"
+                                                "variable")
+                                     "name"   (str symname)
+                                     "status" ["done"]}
+                                  doc (assoc "docstring" doc))
+                         :info  {"doc"          doc
+                                 "ns"           (str ns)
+                                 "name"         (str symname)
+                                 "file"         (if (os.path/isabs file)
+                                                  (->> (urllib.parse/quote file)
+                                                       (urllib.parse/urljoin "file:"))
+                                                  file)
+                                 "line"         line
+                                 "column"       col
+                                 "arglists-str" (forms-join arglists)
+                                 "status"       ["done"]}))
+            status   (if (and (nil? symname) (= mapping-type :eldoc) )
+                       ["done" "no-eldoc"]
+                       ["done"])]
+        (trace :lookup :sym sym-str :doc doc :args arglists)
         (send-fn request (assoc response :status status)))
       (catch python/Exception e
         (let [status (cond->
@@ -327,17 +332,18 @@
                       "status" ["done"]})))
 
 (def ops
-  "A list of operations supported by the nrepl server."
-  {:eval handle-eval
-   :describe handle-describe
-   :info handle-lookup
-   :eldoc handle-lookup
-   :clone handle-clone
-   :close handle-close
+  "A map of operations supported by the nREPL server (as keywords) to function
+  handlers for those operations."
+  {:eval      handle-eval
+   :describe  handle-describe
+   :info      handle-lookup     ;; cider-nrepl middleware
+   :eldoc     handle-lookup     ;; cider-nrepl middleware
+   :clone     handle-clone
+   :close     handle-close
+   :load-file handle-load-file
+   :complete  handle-complete
    ;; :macroexpand handle-macroexpand
    ;; :classpath handle-classpath
-   :load-file handle-load-file
-   :complete handle-complete
    })
 
 (defn- handle-request [{:keys [op] :as request} send-fn]
@@ -354,7 +360,7 @@
 
 (defn- make-send-fn [socket]
   (fn [_request response]
-    (debug :sending (:id _request) :response-keys (keys response))
+    (trace :sending (:id _request) :response-keys (keys response))
     (try
       (.sendall socket (bc/encode response))
       (catch python/TypeError e
@@ -365,14 +371,16 @@
       log-response-mw
       response-for-mw))
 
-(defn- work*-make []
+(defn- work*-make
   "Create and return an atom for a work* registry map to store the
   connected clients and their requests."
+  []
   (atom {}))
 
-(defn- work*-client-add! [work* socket]
+(defn- work*-client-add!
   "Add a new client ``socket`` connection to the ``work*`` map and
   return the client's requests `queue/Queue` assigned to it."
+  [work* socket]
   (let [q (queue/Queue)]
     (swap! work* assoc socket q)
     q))
@@ -411,7 +419,7 @@
       (info "Connection accepted" :info client-info)
       ;; Need to load the `clojure.core` alias because cider uses it
       ;; to test for availability of features.
-      (eval (read-string "(ns user (:require clojure.core))"))
+      (eval '(ns user (:require clojure.core)))
       (swap! client* assoc :eval-ns *ns*)
       (loop [data (.recv socket recv-buffer-size)]
         (if (= data zero-bytes)
@@ -423,8 +431,8 @@
                                            b)
                                          data)
                 [requests unprocessed] (bc/decode-all data {:keywordize-keys true
-                                                            :string-fn #(.decode % "utf-8")})]
-            (debug :requests requests)
+                                                            :string-fn       #(.decode % "utf-8")})]
+            (trace :requests requests)
             (when (not (str/blank? unprocessed))
               (reset! pending unprocessed))
             (doseq [request requests]
@@ -511,7 +519,7 @@
   :work-fn If :async? is truthy, this is the function to process
   pending client `work*`.
 
-  See :lpy:fn:`on-connect!` for additionally supported ``opts`` keys.
+  See `on-connect!` for additionally supported ``opts`` keys.
 
   Known limitations:
 
@@ -543,7 +551,7 @@
   "nREPL server started on port %s on host %s - nrepl://%s:%s")
 
 (defn- server-serve!
-  "Blocking call to serve `server` requests, with graceful erorr
+  "Blocking call to serve `server` requests, with graceful error
   handling.
 
   It returns a map with the following key on error
@@ -560,8 +568,8 @@
         {:error error}))))
 
 (defn start-server!
-  "Create an nREPL server with :lpy:fn:`server-make` (of which see)
-  according to ``opts`` if given, and blocks for serving clients.
+  "Create an nREPL server with `server-make` (of which see) according to
+  ``opts`` if given, and blocks for serving clients.
 
   It prints out the `nrepl-server-signature` message at startup for
   IDEs to pickup the host number to connect to.
@@ -587,7 +595,7 @@
   :nrepl-port-file An optional filepath to write the port number
   to. Typically set to .nrepl-port for the editors to detect.
 
-  :server* An optional promise of a map delivered on sucess with
+  :server* An optional promise of a map delivered on success with
 
            :host The host interface the server is bound to.
 
@@ -595,30 +603,36 @@
 
            :shutdown-fn The function to shutdown the server.
 
-  also see :lpy:fn:`server-make` for additionally supported
-  ``opts`` keys."
+  also see `server-make` for additionally supported ``opts`` keys."
   ([]
    (start-server! {}))
   ([opts]
    (let [{:keys [nrepl-port-file  async? server*] :as k
-          :or   {nrepl-port-file ".nrepl-port"}} opts]
+          :or   {nrepl-port-file ".nrepl-port"}} opts
+         port-file-path (when nrepl-port-file
+                          (try (os.path/abspath nrepl-port-file)
+                               (catch python/Exception _
+                                 nil)))]
      (u/with-eprotect :start-server-error :on-err-str #(err %)
-       (with [port-file (if nrepl-port-file
-                          (python/open nrepl-port-file "w")
+       (with [port-file (if port-file-path
+                          (python/open port-file-path "w")
                           (contextlib/nullcontext))]
              (let [{:keys [error server shutdown-fn work-fn]} (server-make opts)]
                (if error
                  {:error error}
 
-                 (let [[host port] (py->lisp (.-server-address server))]
+                 (let [[host port] (py->lisp (.-server-address server))
+                       port-file-path (when port-file-path
+                                        (try
+                                          (.write port-file (str port))
+                                          (.flush port-file)
+                                          port-file-path
+                                          (catch Exception e
+                                            (warn :nrepl-start-error :can-t-write-to-port-file-at nrepl-port-file e)
+                                            nil)))]
                    (binding [*out* sys/stdout]
                      (println (format nrepl-server-signature port host host port)))
-                   (when port-file
-                     (try
-                       (.write port-file (str port))
-                       (.flush port-file)
-                       (catch Exception e
-                         (warn :nrepl-start-error :can-t-write-to-port-file-at nrepl-port-file e))))
+
                    (if async?
                      ;; the server thread has to be a
                      ;; `threading/Thread`, not a `future`, for the
@@ -629,11 +643,13 @@
                                           :target #(u/with-eprotect :nrepl-server-async-fut
                                                      (server-serve! server)))]
                        (.start server-thread)
-                       {:host host
-                        :port port
-                        :server-thread_ server-thread
-                        :shutdown-fn shutdown-fn
-                        :work-fn work-fn})
+                       (cond-> {:host host
+                                :port port
+                                :server-thread_ server-thread
+                                :shutdown-fn shutdown-fn
+                                :work-fn work-fn}
+                         nrepl-port-file
+                         (assoc :nrepl-port-file port-file-path)))
 
                      (do
                        (when server* (deliver server* {:host host

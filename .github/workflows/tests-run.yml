@@ -46,5 +46,8 @@ jobs:
         run: poetry install
 
       - name: Run tests
-        run: poetry run basilisp test
+        # workaround for https://github.com/basilisp-lang/basilisp/issues/1119
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: poetry run pytest -v
 

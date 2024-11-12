@@ -1,0 +1,6 @@
+{ :tasks
+ {quickdoc {:doc "Invoke quickdoc"
+            :extra-deps {io.github.borkdude/quickdoc {:git/sha "7e41f33d98e2ef697dd9ecdff8e84b779141c7a6"}}
+            :task (exec 'quickdoc.api/quickdoc)
+            :exec-args {:source-paths ["src/basilisp_nrepl_async/nrepl_server.lpy"
+                                       "src/basilisp_nrepl_async/utils.lpy"]}}}}

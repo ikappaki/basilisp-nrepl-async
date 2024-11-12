@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.0b3
+
+- Introduced API.md generated with quickdoc.
+- Relaxed Basilisp version requirements to cover versions up to 1.0.0.
+- Upgraded min Basilisp version to 0.3.2.
+- Dropped 3.8 support and added 3.13 CI testing.
+
 ## 0.1.0b2
 
 - Upgraded Basilisp to 0.2.4.

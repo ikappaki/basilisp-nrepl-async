@@ -42,8 +42,7 @@
 
 (deftype ^:private StreamOutFn [out-fn]
   ;; A type to use as replacement binding for writing to `sys/stdout`
-  ;; stream, so that the output ``value`` is passed to ``out-fn``
-  ;; instead.
+  ;; stream, so that the output `VALUE` is passed to `OUT-FN` instead.
   IStdOut
   (flush [_self]
     nil)
@@ -110,19 +109,19 @@
                       "ns"     ns})))
 
 (defn- do-handle-eval
-  "Evaluate the ``request`` ``code`` of ``file`` in the ``ns`` namespace
-  according to the current state of the ``client*`` and sends its
-  result with ``send-fn``.
+  "Evaluate the `REQUEST` `CODE` of `FILE` in the `NS` namespace
+  according to the current state of the `CLIENT*` and sends its result
+  with `SEND-FN`.
 
   The result sent is either the last evaluated value or exception,
   followed by the \"done\" status.
 
-  If ``ns`` is not provided, then it uses the ``client``'s :eval-ns as
-  the evaluation namespace. The latter is updated with the current
+  If `NS` is not provided, then it uses the `CLIENT`'s :eval-ns as the
+  evaluation namespace. The latter is updated with the current
   namespace after evaluation is completed.
 
   It binds the `*1`, `*2`, `*3` and `*e` variables for evaluation from
-  the corresponding ones found in ``client*``, and updates the latter
+  the corresponding ones found in `CLIENT*`, and updates the latter
   according to the result."
   [{:keys [client* code ns file column line] :as request} send-fn]
   (let [{:keys [*1 *2 *3 *e eval-ns]} @client*
@@ -175,22 +174,22 @@
   (throw (python/NotImplementedError)))
 
 (defn- symbol-identify
-  "Return a vector of information about ``symbol-str`` as might be
-  resolved in ``resolve-ns``.
+  "Return a vector of information about `SYMBOL-STR` as might be
+  resolved in `RESOLVE-NS`.
 
   The returned vector can be one of
 
-  [:keyword KEYWORD] the ``symbol-str`` is this KEYWORD.
+  [:keyword KEYWORD] the `SYMBOL-STR` is this KEYWORD.
 
-  [:nil FORM] the ``symbol-str`` is this nil FORM.
+  [:nil FORM] the `SYMBOL-STR` is this nil FORM.
 
-  [:special-form FORM] the ``symbol-str`` this special FORM.
+  [:special-form FORM] the `SYMBOL-STR` this special FORM.
 
-  [:var VAR] the ``symbol-str`` is this VAR.
+  [:var VAR] the `SYMBOL-STR` is this VAR.
 
-  [:error ERROR] there was this ERROR when trying to parse ``symbol-str``.
+  [:error ERROR] there was this ERROR when trying to parse `SYMBOL-STR`.
 
-  [:other FORM] the ``symbol-str`` is of yet to be categorized FORM."
+  [:other FORM] the `SYMBOL-STR` is of yet to be categorized FORM."
   [resolve-ns symbol-str]
   (let [reader               (io/StringIO symbol-str)
         {:keys [form error]} (try {:form (binding [*ns* resolve-ns]
@@ -226,11 +225,10 @@
        (str/join \newline)))
 
 (defn- handle-lookup
-  "Look up :sym (CIDER) or :symbol (calva) from ``request`` in
-  ``ns`` (or if not provided :eval-ns from ``client*``) and pass
-  results to ``send-fn``.
+  "Look up :sym (CIDER) or :symbol (calva) from `REQUEST` in `NS` (or if
+  not provided :eval-ns from `CLIENT*`) and pass results to `SEND-FN`.
 
-  Serves both :eldoc and :info ``request`` :op's."
+  Serves both :eldoc and :info `REQUEST` :op's."
   [{:keys [ns client*] :as request} send-fn]
   (let [mapping-type      (-> request :op)
         {:keys [eval-ns]} @client*]
@@ -285,8 +283,8 @@
            {"status" status "ex" (str e)}))))))
 
 (defn- handle-load-file
-  "Evaluate code in ``file`` from ``file-path`` and sends the result
-  using the ``send-fn``."
+  "Evaluate code in `FILE` from `FILE-PATH` and sends the result using
+  the `SEND-FN`."
   [{:keys [file _file-name file-path] :as request} send-fn]
   (do-handle-eval (assoc request
                          :file (or file-path "<unspecified filepath>")
@@ -294,11 +292,11 @@
                   send-fn))
 
 (defn- handle-complete
-  "Calculates the name completion candidates for ``prefix`` (or
-  ``req-symbol``) in namespace ``ns`` for ``client*`` and sends the
-  completions using ``send-fn``.
+  "Calculates the name completion candidates for `PREFIX` (or
+  `REQ-SYMBOL`) in namespace `NS` for `CLIENT*` and sends the
+  completions using `SEND-FN`.
 
-  If ``ns`` is not provided, then the ``client*`` :eval-ns is used
+  If `NS` is not provided, then the `CLIENT*` :eval-ns is used
   instead."
   [{:keys [client* ns prefix] req-symbol :symbol :as request} send-fn]
   (let [prefix            (or prefix req-symbol)
@@ -378,23 +376,23 @@
   (atom {}))
 
 (defn- work*-client-add!
-  "Add a new client ``socket`` connection to the ``work*`` map and
-  return the client's requests `queue/Queue` assigned to it."
+  "Add a new client `SOCKET` connection to the `WORK*` map and return
+  the client's requests `queue/Queue` assigned to it."
   [work* socket]
   (let [q (queue/Queue)]
     (swap! work* assoc socket q)
     q))
 
 (defn- on-connect! [tcp-req-handler opts]
-  "Serve a new nREPL connection as found in ``tcp-req-handler``
-   according to ``opts``.
+  "Serve a new nREPL connection as found in `TCP-REQ-HANDLER`
+   according to `OPTS`.
 
   New client connections begin at the `user` namespace and it binds
   `*1`, `*2`, `*3` and `*e` to the ultimate, penultimate,
   antepenultimate evaluation result and last exception message
   respectively.
 
-  ``opts`` is a map of options with the following optional keys.
+  `OPTS` is a map of options with the following optional keys.
 
   :recv-buffer-size The buffer size to use for incoming nREPL
   messages.
@@ -450,9 +448,9 @@
         (err (traceback/format-exc))))))
 
 (defn- clients-work-do!
-  "Execute all client requests contained in ``work*``.
+  "Execute all client requests contained in `WORK*`.
 
-   ``work*`` is an atom containing a map where each key is a client's
+   `WORK*` is an atom containing a map where each key is a client's
   socket object, and each value is a `queue.Queue` of client request
   functions to be executed.
 
@@ -471,9 +469,9 @@
               (req)
               (debug ":async-work-req-done"))))))))
 
-(defn server-shutdown!
-  "Shut down the `server` and close any open client connections in the
-  `work*` atom if present.
+(defn- server-shutdown!
+  "Shut down the `SERVER` and close any open client connections in the
+  `WORK*` atom if present.
 
   It returns a map with the following key on error
 
@@ -490,36 +488,36 @@
           (.close socket))))
     (.server-close server)))
 
-(defn server-make
-  "Create a `socketserver/TCPServer` serving nREPL clients
-  according to ``opts`` at 127.0.0.1 at a random available port.
+(defn- server-make
+  "Create a `socketserver/TCPServer` serving nREPL clients according to
+  `OPTS` at 127.0.0.1 at a random available port.
 
-  New client connections are handled by `on-connect`, of which see.
+  New client connections are handled by `on-connect!`, of which see.
 
   See `ops` for the operation supported by the server.
 
-  ``opts`` is a map of options with the following optional keys
+  `OPTS` is a map of options with the following optional keys
 
-  :async? If truthy, `on-connect` `on-connect` queues client requests
-  in a `work*` registry instead of executing them immediately.
+  `:async?` If truthy, `on-connect!` queues client requests in a
+  `work*` registry instead of executing them immediately.
 
-  :host The host address to bind to, defaults to 127.0.0.1.
+  `:host` The host address to bind to, defaults to 127.0.0.1.
 
-  :port The port number to listen to, defaults to 0 which means to
+  `:port` The port number to listen to, defaults to 0 which means to
   pickup a random available port.
 
   It returns a map with the following keys
 
-  :error Contains details of any error during server creation.
+  `:error` Contains details of any error during server creation.
 
-  :server The `socketserver/ThreadingTCPServer` server object.
+  `:server` The `socketserver/ThreadingTCPServer` server object.
 
-  :shutdown-fn A function to gracefully shut down the server.
+  `:shutdown-fn` A function to gracefully shut down the server.
 
-  :work-fn If :async? is truthy, this is the function to process
+  `:work-fn` If `:async?` is truthy, this is the function to process
   pending client `work*`.
 
-  See `on-connect!` for additionally supported ``opts`` keys.
+  See `on-connect!` for additionally supported `OPTS` keys.
 
   Known limitations:
 
@@ -551,12 +549,12 @@
   "nREPL server started on port %s on host %s - nrepl://%s:%s")
 
 (defn- server-serve!
-  "Blocking call to serve `server` requests, with graceful error
+  "Blocking call to serve `SERVER` requests, with graceful error
   handling.
 
   It returns a map with the following key on error
 
-  :error Contains the details of the error."
+  `:error` Contains the details of the error."
   [server]
   (try
     (.serve-forever server)
@@ -567,45 +565,48 @@
         (err (u/error->str error))
         {:error error}))))
 
-(defn start-server!
-  "Create an nREPL server with `server-make` (of which see) according to
-  ``opts`` if given, and blocks for serving clients.
+(defn server-start!
+  "Creates an `socketserver/ThreadingTCPServer` nREPL server with
+  optional `OPTS`. By default, it listens on `127.0.0.1` at a random
+  available port and blocks for serving clients.
 
   It prints out the `nrepl-server-signature` message at startup for
   IDEs to pickup the host number to connect to.
 
-  ``opts`` is a map of options with the following optional keys
+  `OPTS` is a map of options with the following optional keys
 
-  :async? If truthy, runs the server non-blocking in a separate thread
-  where requests are queued instead of executed immediately. Returns a
-  map with
+  `:async?` If truthy, runs the server non-blocking in a separate
+  thread where requests are queued instead of executed
+  immediately. Returns a map with
 
-           :error :error Contains details of any error during server
-           creation.
+     :error Contains details of any error during server creation.
 
-           :host The host interface the server is bound to.
+     :host The host interface the server is bound to.
 
-           :port The local port the server is listening on.
+     :port The local port the server is listening on.
 
-           :shutdown-fn The function to shutdown the server.
+     :shutdown-fn The function to shutdown the server.
 
-           :work-fn The function to process any pending client
-           requests.
+     :work-fn The function to process any pending client requests.
 
-  :nrepl-port-file An optional filepath to write the port number
-  to. Typically set to .nrepl-port for the editors to detect.
+  `:host` The host address to bind to, defaults to 127.0.0.1.
 
-  :server* An optional promise of a map delivered on success with
+  `:nrepl-port-file` An optional filepath to write the port number
+  to. Typically set to .nrepl-port (the default) for the editors to
+  detect.
 
-           :host The host interface the server is bound to.
+  `:port` The port number to listen to, defaults to 0 which means to
 
-           :port The local port the server is listening on.
+  `:server*` An optional promise delivering a map on server upbringing
+  with the following keys
 
-           :shutdown-fn The function to shutdown the server.
+     :host The host interface the server is bound to.
 
-  also see `server-make` for additionally supported ``opts`` keys."
+     :port The local port the server is listening on.
+
+     :shutdown-fn The function to shutdown the server."
   ([]
-   (start-server! {}))
+   (server-start! {}))
   ([opts]
    (let [{:keys [nrepl-port-file  async? server*] :as k
           :or   {nrepl-port-file ".nrepl-port"}} opts

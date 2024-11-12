@@ -3,20 +3,23 @@
             [basilisp.stacktrace :as st]
             [basilisp.string :as str]))
 
-(defmacro error-make [& details]
-  "Returns a list from the provided error ``details`` to represent an
+(defmacro error-make
+  "Returns a list from the provided error `DETAILS` to represent an
   error."
+  [& details]
   `(list ~@details))
 
-(defmacro error-add [error & details]
-  "Adds additional `details`` to he existing ``error`` list and
-  returns it."
+(defmacro error-add
+  "Adds additional `DETAILS` to the existing `ERROR` list and returns
+  it."
+  [error & details]
   (let [rdetails (reverse details)]
     `(conj ~error ~@rdetails)))
 
-(defmacro error->str [error]
-  "Converts the ``error`` list to a human-readable string and returns
+(defmacro error->str
+  "Converts the `ERROR` list to a human-readable string and returns
   it. Includes stack traces for any embedded exceptions."
+  [error]
   `(apply str (str/join " " ~error)
           (let [excs# (filter (fn [e#]
                                 (instance? ~'Exception e#)) ~error)]
@@ -25,16 +28,18 @@
                     (for [exc# excs#]
                       (str "\n" (with-out-str (st/print-stack-trace exc#)))))))))
 
-(defmacro with-eprotect [id-or-opts & body]
-  "Creates a try/catch wrapper around ``body`` that returns any
-exception as an `error` formatted with the `id` in ``id-or-opts``.
+(defmacro with-eprotect
+  "Creates a try/catch wrapper around `BODY` that returns any exception
+  as an `error` prefixed with the `id` from `ID-OR-OPTS`.
 
- ``id-or-opts`` is either a printable object used as the `id`, or a map with the following keys
+  `ID-OR-OPTS` is either a printable object used as the `id`, or a map
+  with the following keys
 
- :id The `id`.
+  `:id` The `id` to prefix the error with.
 
- :on-err-str [opt] A function to call if an exception is caught, which
- accepts the formated error message as only argument."
+  `:on-err-str` [opt] A function to call if an exception is caught,
+  which accepts the formated error message as only argument."
+  [id-or-opts & body]  
   (let [opt-set #{:id :on-err-str}
         {:keys [id on-err-str]}
         (if (map? id-or-opts)

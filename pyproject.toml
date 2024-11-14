@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "basilisp-nrepl-async"
-version = "0.1.0b2"
+version = "0.1.0b3"
 description = ""
 authors = ["ikappaki <ikappaki@users.noreply.github.com>"]
 readme = "README.md"
@@ -10,8 +10,8 @@ packages = [{include = "basilisp_nrepl_async", from = "src"}]
 Homepage = "https://github.com/ikappaki/basilisp-nrepl-async"
 
 [tool.poetry.dependencies]
-python = "^3.8"
-basilisp = "^0.2.4"
+python = "^3.9"
+basilisp = ">=0.3.2"
 
 
 [tool.poetry.group.dev.dependencies]

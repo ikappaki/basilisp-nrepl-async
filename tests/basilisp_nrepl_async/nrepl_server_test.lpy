@@ -30,14 +30,13 @@
   nil)
 
 (defmacro with-server-make
+  "Create an nREPL server on a thread with `nrepl-server/server-make`
+  passing in `OPTS`, bind its port to `*nrepl-port*`, run `BODY` on
+  the main thread, and then shutdown server."
   [opts & body]
-  "Create an nREPL server on a thread with
-  `basilisp-blender.nrepl-server/server-make` passing in ``opts``,
-  bind its port to `*nrepl-port*`, run ``body`` on the main thread,
-  and then shutdown server."
   `(let [{error#       :error       server#  :server
           shutdown-fn# :shutdown-fn work-fn# :work-fn}
-         (nr/server-make ~opts)]
+         (#'nr/server-make ~opts)]
 
      (if error#
        (throw (python/Exception (u/error->str error#)))
@@ -54,16 +53,17 @@
                (shutdown-fn#)
                (= :done (deref server-fut# 1000 :time-out)))))))))
 
-(defmacro with-connect [client & body]
-  "Open up a connection to the nREPL-server at ``*nrepl-port*`` and
-  run ``body``, with the ``client`` exposed as an anaphoric binding.
+(defmacro with-connect
+  "Open up a connection to the nREPL-server at `*nrepl-port*` and run
+  `BODY`, with the `CLIENT` exposed as an anaphoric binding.
 
-  ``client`` is a map with the following keys:
+  `CLIENT` is a map with the following keys:
 
   :backlog* A helper atom for the `client-rev!` to keep track of the
   arriving responses and any yet incomplete bencoded messages.
 
   :sock The socket connection to the server."
+  [client & body]
   `(with [sock# (socket/socket socket/AF_INET socket/SOCK_STREAM)]
          (let [~client {:sock sock# :backlog* (atom {:items [] :fraction nil})}]
            (.connect sock# (python/tuple ["127.0.0.1" *nrepl-port*]))
@@ -71,14 +71,14 @@
            ~@body)))
 
 (defn client-send!
-  "Send ``value`` to the server the ``client`` is connected to."
+  "Send `VALUE` to the server the `CLIENT` is connected to."
   [client value]
   (let [{:keys [sock]} client
         v (bc/encode value)]
     (.sendall sock v)))
 
 (defn client-recv!
-  "Receive and return nREPL response from the server the ``client`` is
+  "Receive and return nREPL response from the server the `CLIENT` is
   connected to."
   [client]
   (let [{:keys [sock backlog*]} client]
@@ -97,7 +97,7 @@
 
 (deftest server-make-test
   (testing "server-make"
-    (let [{:keys [error server shutdown-fn work-fn]} (nr/server-make {})]
+    (let [{:keys [error server shutdown-fn work-fn]} (#'nr/server-make {})]
       (is (nil? error))
       (is server)
       (is shutdown-fn)
@@ -128,7 +128,7 @@
             (is :done (deref server-fut 1000 :time-out)))))))
 
   (testing "server-shutdown"
-    (let [{:keys [server shutdown-fn]} (nr/server-make {})]
+    (let [{:keys [server shutdown-fn]} (#'nr/server-make {})]
       (is server)
       (is shutdown-fn)
       (let [server-fut (future
@@ -153,12 +153,12 @@
       (is (str/starts-with? error-str ":server-shutdown!-error") error-str)))
 
   (testing "server test :port option"
-    (let [{:keys [error server]} (nr/server-make {:port -1})]
+    (let [{:keys [error server]} (#'nr/server-make {:port -1})]
       (is (nil? server))
       (is (str/starts-with? (u/error->str error) ":server-make-error" ) (u/error->str error))))
 
   (testing "server test :host option"
-    (let [{:keys [error server]} (nr/server-make {:host "///"})]
+    (let [{:keys [error server]} (#'nr/server-make {:host "///"})]
       (is (nil? server))
       (is (str/starts-with? (u/error->str error) ":server-make-error" ) (u/error->str error)))
 
@@ -215,7 +215,7 @@
       (is (str/starts-with? error-str ":nrepl-clients-work-do-error") error-str)))
 
   (testing "server make async"
-    (let [{:keys [error server shutdown-fn work-fn]} (nr/server-make {:async? true})]
+    (let [{:keys [error server shutdown-fn work-fn]} (#'nr/server-make {:async? true})]
       (is (nil? error))
       (is server)
       (is shutdown-fn)
@@ -839,15 +839,15 @@
 (defmacro with-start-server
   [opts & body]
   "Create an nREPL server on a thread with
-  `basilisp-blender.nrepl-server/start-server!` passing in ``opts``,
-  bind its port to `*nrepl-port*`, run ``body`` on the main thread,
-  and then shutdown server."
+  `basilisp-blender.nrepl-server/server-start!` passing in `OPTS`,
+  bind its port to `*nrepl-port*`, run `BODY` on the main thread, and
+  then shutdown server."
   `(let [opts# (cond-> ~opts
                  (not (contains? ~opts :server*))
                  (assoc :server* (promise)))
          {server*# :server*} opts#
          server-fut# (future
-                       (nr/start-server! opts#)
+                       (nr/server-start! opts#)
                        :done)]
      (let [{error# :error host#        :host
             port#   :port  shutdown-fn# :shutdown-fn}
@@ -878,7 +878,7 @@
     (let [server* (promise)
           opts {:server* server*}
           server-fut (future
-                       (nr/start-server! opts)
+                       (nr/server-start! opts)
                        :done)]
       (let [{:keys [error host port shutdown-fn]} (deref server* 1000 (u/error-make :server-start-timeout))]
         (try
@@ -915,7 +915,7 @@
     (let [server* (promise)
           [fd filename] (tempfile/mkstemp "nrepl-server-port-test")
           server-fut (future
-                       (nr/start-server! {:server* server* :nrepl-port-file filename :host "0.0.0.0"})
+                       (nr/server-start! {:server* server* :nrepl-port-file filename :host "0.0.0.0"})
                        :done)]
       (let [{:keys [host port] :as server} (deref server* 1000 nil)]
         (is server)
@@ -956,7 +956,7 @@
 (deftest nrepl-server-async
   (testing "async work"
     (let [stop-sig* (promise)
-          {:keys [host port server-thread_ shutdown-fn work-fn]} (nr/start-server! {:async? true})]
+          {:keys [host port server-thread_ shutdown-fn work-fn]} (nr/server-start! {:async? true})]
       (is (and host port server-thread_ shutdown-fn work-fn))
 
       (try

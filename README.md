@@ -6,7 +6,9 @@
 
 ## Overview
 
-This package provides an nREPL server implementation for Basilisp, evolved from the `basilisp.contrib.nrepl-server` namespace in Basilisp, addressing issues that arise from serving nREPL request in parallel with the main event loop.
+An nREPL server is a networked REPL for Clojure that facilitates remote code evaluation, code completion, and debugging within Clojure-enabled editors like Emacs (via [CIDER](https://docs.cider.mx/cider/index.html)) and VS Code (via [Calva](https://calva.io/)), among others.
+
+This package provides an nREPL server implementation for Basilisp Clojure, evolved from the [basilisp.contrib.nrepl-server](https://basilisp.readthedocs.io/en/latest/api/contrib/nrepl-server.html) namespace in Basilisp, addressing issues that arise from serving nREPL request in parallel with the main event loop.
 
 Serving an nREPL client connection on a parallel thread in Python may conflict with the Global Interpreter Lock (GIL) and single-threaded libraries, potentially causing errors or crashes.
 
@@ -17,16 +19,27 @@ To mitigate this, the library includes an asynchronous mode where client request
 To install `basilisp-nrepl-async`, run:
 
 ```shell
-pip install https://github.com/ikappaki/basilisp-nrepl-async/releases/download/v0.1.0b3/basilisp_nrepl_async-0.1.0b3-py3-none-any.whl
+pip install basilisp-nrepl-async
 ```
 
 ## Usage
 
 See [API.md](API.md).
 
+### Synchronous mode
+
+To start in synchronous mode, call [server-start!](API.md#basilisp-nrepl-async.nrepl-server/server-start!) with the optional `:host`, `:port` and `:nrepl-port-file` keys. The server will block and handle client requests as they arrive.
+
+```clojure
+(require '[basilisp-nrepl-async.nrepl-server :as nr])
+
+(def server-async (nr/server-start! {:port 9999}))
+; nREPL server started on port 9999 on host 127.0.0.1 - nrepl://127.0.0.1:9999
+```
+
 ### Asynchronous mode
 
-To start the nREPL server on a random port bound to the local interface in asynchronous mode, call [server-start!](API.md#basilisp-nrepl-async.nrepl-server/server-start!) with the `async?` option set to `true`. Periodically invoke the returned `work-fn` within your program's main loop to handle client requests.
+To start the nREPL server on a random port bound to the local interface in asynchronous mode, call [server-start!](API.md#basilisp-nrepl-async.nrepl-server/server-start!) with the `async?` option set to `true`. Periodically invoke the returned `work-fn` within your program's main loop to handle client requests. Use the `shutdown-fn` to stop the server.
 
 ```clojure
 (require '[basilisp-nrepl-async.nrepl-server :as nr])
@@ -52,17 +65,6 @@ To start the nREPL server on a random port bound to the local interface in async
 The server will create an `.nrepl-port` file in the current working directory with the port number, which nREPL-enabled Clojure editors can use to connect.
 
 You can also pass additional options to the [server-start!](API.md#basilisp-nrepl-async.nrepl-server/server-start!) function, such as `:host`, `:port` and `:nrepl-port-file`, to explicitly configure the server's listening interface, port, and the file where the port number is written (typically `<your-basilisp-lib>/.nrepl-port` for integration with your editor).
-
-### Synchronous mode
-
-To start in synchronous mode, call [server-start!](API.md#basilisp-nrepl-async.nrepl-server/server-start!) with the optional `:host`, `:port` and `:nrepl-port-file` keys. The server will block and handle client requests as they arrive.
-
-```clojure
-(require '[basilisp-nrepl-async.nrepl-server :as nr])
-
-(def server-async (nr/server-start! {:port 9999}))
-; nREPL server started on port 9999 on host 127.0.0.1 - nrepl://127.0.0.1:9999
-```
 
 ## Development and Testing
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0
+
+- A Basilisp Clojure async nREPL server for cooperative multitasking.
+
 ## 0.1.0b3
 
 - Introduced API.md generated with quickdoc.

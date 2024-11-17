@@ -19,7 +19,7 @@ To mitigate this, the library includes an asynchronous mode where client request
 To install `basilisp-nrepl-async`, run:
 
 ```shell
-pip install https://github.com/ikappaki/basilisp-nrepl-async/releases/download/v0.1.0b3/basilisp_nrepl_async-0.1.0b3-py3-none-any.whl
+pip install basilisp-nrepl-async
 ```
 
 ## Usage

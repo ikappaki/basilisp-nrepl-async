@@ -596,6 +596,7 @@
   detect.
 
   `:port` The port number to listen to, defaults to 0 which means to
+  pickup a random available port.
 
   `:server*` An optional promise delivering a map on server upbringing
   with the following keys

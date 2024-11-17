@@ -23,7 +23,7 @@
 
 
 The logger for this namespace.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/nrepl_server.lpy#L19-L21">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/nrepl_server.lpy#L19-L21">Source</a></sub></p>
 
 ## <a name="basilisp-nrepl-async.nrepl-server/ops">`ops`</a><a name="basilisp-nrepl-async.nrepl-server/ops"></a>
 
@@ -32,7 +32,7 @@ The logger for this namespace.
 
 A map of operations supported by the nREPL server (as keywords) to function
   handlers for those operations.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/nrepl_server.lpy#L332-L345">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/nrepl_server.lpy#L332-L345">Source</a></sub></p>
 
 ## <a name="basilisp-nrepl-async.nrepl-server/server-start!">`server-start!`</a><a name="basilisp-nrepl-async.nrepl-server/server-start!"></a>
 ``` clojure
@@ -72,6 +72,7 @@ Creates an `socketserver/ThreadingTCPServer` nREPL server with
   detect.
 
   `:port` The port number to listen to, defaults to 0 which means to
+  pickup a random available port.
 
   `:server*` An optional promise delivering a map on server upbringing
   with the following keys
@@ -81,7 +82,7 @@ Creates an `socketserver/ThreadingTCPServer` nREPL server with
      :port The local port the server is listening on.
 
      :shutdown-fn The function to shutdown the server.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/nrepl_server.lpy#L568-L659">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/nrepl_server.lpy#L568-L660">Source</a></sub></p>
 
 -----
 # <a name="basilisp-nrepl-async.utils">basilisp-nrepl-async.utils</a>
@@ -100,7 +101,7 @@ Macro.
 
 Converts the `ERROR` list to a human-readable string and returns
   it. Includes stack traces for any embedded exceptions.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/utils.lpy#L19-L29">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/utils.lpy#L19-L29">Source</a></sub></p>
 
 ## <a name="basilisp-nrepl-async.utils/error-add">`error-add`</a><a name="basilisp-nrepl-async.utils/error-add"></a>
 ``` clojure
@@ -111,7 +112,7 @@ Macro.
 
 Adds additional `DETAILS` to the existing `ERROR` list and returns
   it.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/utils.lpy#L12-L17">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/utils.lpy#L12-L17">Source</a></sub></p>
 
 ## <a name="basilisp-nrepl-async.utils/error-make">`error-make`</a><a name="basilisp-nrepl-async.utils/error-make"></a>
 ``` clojure
@@ -122,7 +123,7 @@ Macro.
 
 Returns a list from the provided error `DETAILS` to represent an
   error.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/utils.lpy#L6-L10">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/utils.lpy#L6-L10">Source</a></sub></p>
 
 ## <a name="basilisp-nrepl-async.utils/with-eprotect">`with-eprotect`</a><a name="basilisp-nrepl-async.utils/with-eprotect"></a>
 ``` clojure
@@ -141,4 +142,4 @@ Creates a try/catch wrapper around `BODY` that returns any exception
 
   `:on-err-str` [opt] A function to call if an exception is caught,
   which accepts the formated error message as only argument.
-<p><sub><a href="/blob/main/src/basilisp_nrepl_async/utils.lpy#L31-L61">Source</a></sub></p>
+<p><sub><a href="https://github.com/ikappaki/basilisp-nrepl-async/blob/master/src/basilisp_nrepl_async/utils.lpy#L31-L61">Source</a></sub></p>

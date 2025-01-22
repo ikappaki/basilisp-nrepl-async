@@ -4,7 +4,7 @@
 
 ## 0.1.1
 
-- Gracefully handle a `nil` :port option in `server-make`
+- Gracefully handle a `nil` :port option in `server-make` (#4).
 
 ## 0.1.0
 

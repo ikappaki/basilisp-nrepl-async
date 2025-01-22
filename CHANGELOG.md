@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.1
+
+- Gracefully handle a `nil` :port option in `server-make`
+
 ## 0.1.0
 
 - A Basilisp Clojure async nREPL server for cooperative multitasking.

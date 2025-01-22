@@ -529,7 +529,10 @@
   initial clone op."
   [opts]
   (u/with-eprotect :server-make-error
-    (let [{:keys [async? host port] :or {host "127.0.0.1" port 0}} opts
+    (let [{:keys [async? host port]} opts
+          host (or host "127.0.0.1")
+          port (or port 0)
+
           work* (when async? (work*-make))
           opts (cond-> opts
                  async?

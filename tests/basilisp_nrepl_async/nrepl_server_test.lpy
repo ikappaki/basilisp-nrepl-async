@@ -155,7 +155,14 @@
   (testing "server test :port option"
     (let [{:keys [error server]} (#'nr/server-make {:port -1})]
       (is (nil? server))
-      (is (str/starts-with? (u/error->str error) ":server-make-error" ) (u/error->str error))))
+      (is (str/starts-with? (u/error->str error) ":server-make-error" ) (u/error->str error)))
+
+    ;; nil port
+    (with-server-make {:port nil}
+      (with-connect client
+        (client-send! client {:id 1 :op "clone"})
+        (let [{:keys [status]} (client-recv! client)]
+          (is (= ["done"] status))))))
 
   (testing "server test :host option"
     (let [{:keys [error server]} (#'nr/server-make {:host "///"})]

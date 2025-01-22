@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "basilisp-nrepl-async"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["ikappaki <ikappaki@users.noreply.github.com>"]
 readme = "README.md"
@@ -18,5 +18,5 @@ basilisp = ">=0.3.2"
 pytest = "^8.3.3"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core<2"]
 build-backend = "poetry.core.masonry.api"
